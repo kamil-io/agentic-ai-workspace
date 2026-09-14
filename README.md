@@ -4,6 +4,10 @@ Workflow definitions and operating documentation for Robot People Industries.
 
 The project supports KebunData smart-farming engagement and marketing operations with n8n as the workflow engine, PostgreSQL for state, and human approval before external publishing.
 
+## Agent organisation
+
+See the [company agent organisation](docs/agent-organisation.md) for the proposed chart, confirmed names and role boundaries: Ahmad as CEO, ak.kamil as Pekebun Data (Developer & Farmer), Fahmi_bot for operations, Man_bot for finance and Salleh_bot for security. Pending name assignments and runtime migrations are recorded explicitly.
+
 ## Architecture
 
 ```text
