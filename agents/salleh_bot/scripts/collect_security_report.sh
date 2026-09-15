@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Abu's OCI collector is intentionally read-only. It sends only a sanitized
+# Salleh_bot's OCI collector is intentionally read-only. It sends only a sanitized
 # summary to n8n; scanner output and raw logs remain on the host.
 config_file="${ABU_CONFIG_FILE:-/home/ubuntu/.config/abu-security/report.env}"
 if [[ ! -r "$config_file" ]]; then
-  echo "Abu configuration file is missing: $config_file" >&2
+  echo "Salleh_bot configuration file is missing: $config_file" >&2
   exit 1
 fi
 # shellcheck disable=SC1090

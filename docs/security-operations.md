@@ -1,6 +1,6 @@
-# Abu security operations
+# Salleh_bot security operations
 
-Abu is the local security advisor for Robot People Industries. Abu interprets evidence from security tools and proposes remediation; Abu is not the security control itself.
+Salleh_bot is the local security advisor for Robot People Industries. Salleh_bot interprets evidence from security tools and proposes remediation; Salleh_bot is not the security control itself.
 
 ## Evidence sources
 
@@ -17,7 +17,7 @@ Abu is the local security advisor for Robot People Industries. Abu interprets ev
 
 1. Collect read-only evidence.
 2. Run deterministic checks.
-3. Have Abu assess severity and impact.
+3. Have Salleh_bot assess severity and impact.
 4. Send Ahmad a concise report with remediation options.
 5. Apply production changes only after explicit approval.
 6. Verify the result and record what changed.
@@ -43,7 +43,7 @@ The first report should cover:
 
 ## Weekly OCI collector
 
-The versioned collector at `agents/abu/scripts/collect_security_report.sh` runs on OCI as the `ubuntu` user. It uses read-only checks, sends a sanitized JSON summary to n8n through a header-authenticated webhook, and n8n sends the Telegram report.
+The versioned collector at `agents/salleh_bot/scripts/collect_security_report.sh` runs on OCI as the `ubuntu` user. It uses read-only checks, sends a sanitized JSON summary to n8n through a header-authenticated webhook, and n8n sends the Telegram report.
 
 Runtime configuration is deliberately outside Git:
 
@@ -58,7 +58,7 @@ ABU_TRIVY_CACHE_PATH=/home/ubuntu/.cache/abu-trivy
 The collector reports counts and status only. It does not transmit scanner findings, credentials or raw logs.
 It scans at most two active container images per run by default to keep the weekly job suitable for the current OCI capacity.
 
-The systemd templates under `agents/abu/systemd/` schedule the report for Monday at 01:00 UTC with a randomized delay of up to 15 minutes. Installing the files is not enough to activate the timer; a named human operator must explicitly enable it after the n8n webhook credential, Telegram credential, chat ID and host configuration have been verified.
+The systemd templates under `agents/salleh_bot/systemd/` schedule the report for Monday at 01:00 UTC with a randomized delay of up to 15 minutes. Their existing `abu-security-report` unit names are retained for runtime compatibility. Installing the files is not enough to activate the timer; a named human operator must explicitly enable it after the n8n webhook credential, Telegram credential, chat ID and host configuration have been verified.
 
 Suggested deployment sequence:
 

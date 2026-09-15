@@ -37,9 +37,9 @@ Confirmed on 15 September 2026: Ahmad_ceo_bot is CEO, Alan_bot handles Sales & C
 
 ## Identity transitions
 
-- Salleh_bot is the planned new display name for the security role previously called Abu. Existing `agents/abu/` files and Abu-labelled workflows remain the current implementation until a reviewed migration.
+- Salleh_bot is the security role previously called Abu. The repository role files have been migrated to `agents/salleh_bot/`; existing n8n workflow identifiers retain `Abu` until a separately tested runtime migration.
 - Fahmi_bot is a distinct Operations Coordinator; Ahmad_ceo_bot holds the CEO role.
-- The legacy ALI/Marketer responsibilities are intended to be consolidated under Hafeez_bot for Marketing & Content.
+- The legacy ALI/Marketer responsibilities are consolidated under Hafeez_bot for Marketing & Content.
 - ak.kamil leads technical delivery alongside operations coordination, supported by the Delivery & Automation assistant.
 - Hermes is an execution runtime in this plan; it is not an additional business reporting role.
 

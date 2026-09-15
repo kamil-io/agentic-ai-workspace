@@ -11,7 +11,7 @@ Panduan lengkap untuk memasang dan menjalankan sistem **Auto-Post & Two-Tier Aut
    - Menghasilkan post berimpak tinggi dalam gaya *Santai BM / Manglish* dengan struktur Hook, Isi Ringkas, dan Engagement Loop.
 2. **Auto-Reply Inbound (The Conversation Multiplier):**
    - Mendengar komen baharu di bawah post anda setiap 10 minit.
-   - Menggabungkan kepakaran **Farmer Agent** (fakta agronomi tepat) dan **Marketer Agent** (gaya mesra member kebun).
+   - Menggabungkan kepakaran **Farmer Agent** (fakta agronomi tepat) dan **Hafeez_bot** (gaya mesra member kebun).
    - **WAJIB menyoal semula pengguna** bagi membina *multi-turn discussion* yang menaikkan ranking algoritma Threads.
 3. **Outbound Niche Hunter (The Community Growth Scout):**
    - Beroperasi setiap 2 jam (atau melalui Python CLI / cron).
