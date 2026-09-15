@@ -116,12 +116,12 @@ python skills/outbound_threads_engager.py --publish
 1. Buka antaramuka **n8n Web Interface** anda di OCI server.
 2. Pergi ke **Workflows** > klik **Add Workflow** > menu tiga titik (top right) > **Import from File**.
 3. Terdapat 4 blueprint yang telah disediakan dalam folder `workflows/`:
-   - `workflows/kebundata-threads-autopost.json` (Penjadualan Post Automatik).
-   - `workflows/kebundata-threads-autoreply.json` (Pendengar & Penjawab Komen Inbound Automatik).
-   - `workflows/kebundata-threads-outbound-engager.json` (Pemburu Topik Niche & Penjawab Komuniti Outbound).
-   - `workflows/kebundata-threads-content-factory.json` (Pencipta & Penerbit Content Factory Automatik menerusi Webhook/API).
-4. Pastikan pembolehubah `THREADS_USER_ID`, `THREADS_ACCESS_TOKEN`, dan `GEMINI_API_KEY` telah dimasukkan ke dalam n8n Environment Variables atau disesuaikan pada node HTTP Request.
-5. Tukarkan status workflow kepada **Active: True**.
+   - `workflows/hafeez_bot/threads/kebundata-threads-autopost.json` (Penjadualan kandungan).
+   - `workflows/hafeez_bot/threads/kebundata-threads-autoreply.json` (Balasan komen inbound).
+   - `workflows/hafeez_bot/threads/kebundata-threads-outbound-engager.json` (Draf balasan komuniti outbound).
+   - `workflows/hafeez_bot/threads/kebundata-threads-content-factory.json` (Kandungan menerusi Webhook/API).
+4. Gunakan n8n Credentials untuk token dan API keys; jangan masukkan rahsia dalam data workflow.
+5. Kekalkan workflow tidak aktif sehingga semua syarat dalam [workflow operations](workflow-operations.md) dan [workflow portfolios](../workflows/README.md) disahkan. Autopost, Autoreply dan Content Factory masih memerlukan pembaikan approval sebelum activation.
 
 ---
 

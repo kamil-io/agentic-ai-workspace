@@ -42,13 +42,15 @@ Odoo is the intended system of record for CRM and commercial operations. The cur
 
 ## Threads workflow templates
 
-| Workflow | Purpose | Default state |
-| --- | --- | --- |
-| `kebundata-threads-outbound-engager.json` | Finds suitable conversations, produces a draft, stores it, then requests approval | Inactive |
-| `kebundata-threads-approval-handler.json` | Validates an approval against its stored draft and publishes only an approved reply | Inactive |
-| `kebundata-threads-autopost.json` | Scheduled draft and publishing template | Inactive |
-| `kebundata-threads-autoreply.json` | Inbound reply template | Inactive |
-| `kebundata-threads-content-factory.json` | Webhook-driven content template | Inactive |
+| Owner | Workflow | Purpose | Template state |
+| --- | --- | --- | --- |
+| Hafeez_bot | [Outbound engager](workflows/hafeez_bot/threads/kebundata-threads-outbound-engager.json) | Find conversations and store reply drafts for approval | Inactive |
+| Fahmi_bot | [Approval handler](workflows/fahmi_bot/approvals/kebundata-threads-approval-handler.json) | Coordinate human approval and authorised publication | Inactive |
+| Hafeez_bot | [Autopost](workflows/hafeez_bot/threads/kebundata-threads-autopost.json) | Scheduled content; approval integration required | Inactive |
+| Hafeez_bot | [Autoreply](workflows/hafeez_bot/threads/kebundata-threads-autoreply.json) | Inbound replies; approval integration required | Inactive |
+| Hafeez_bot | [Content factory](workflows/hafeez_bot/threads/kebundata-threads-content-factory.json) | Requested content; authentication and approval integration required | Inactive |
+
+See the [workflow portfolios](workflows/README.md) for all owners, naming conventions, handoffs and activation gates. Moving a template does not certify it for production.
 
 Read [workflow operations](docs/workflow-operations.md) before importing or activating a workflow.
 

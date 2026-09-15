@@ -62,7 +62,7 @@ The systemd templates under `agents/salleh_bot/systemd/` schedule the report for
 
 Suggested deployment sequence:
 
-1. Import `workflows/abu-weekly-security-report.json` into n8n and keep it inactive.
+1. Import `workflows/salleh_bot/security/abu-weekly-security-report.json` into n8n and keep it inactive.
 2. Assign an n8n Header Auth credential whose header is `X-Abu-Report-Secret`, assign the Telegram credential, and replace `YOUR_TELEGRAM_CHAT_ID`.
 3. Create `/home/ubuntu/.config/abu-security/report.env` with mode `0600`; never add it to Git.
 4. Install the collector at `/usr/local/lib/abu-security/collect_security_report.sh` and the service and timer templates in `/etc/systemd/system/`, then run one manual service test while the n8n workflow is active and observed.

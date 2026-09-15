@@ -10,7 +10,7 @@ This guide explains how to import, configure, and run the **Etiqa Takaful Social
 3. Click the **three dots menu** in the top-right corner of the empty workflow canvas.
 4. Select **Import from File**.
 5. Select the **`etiqa-marketer.json`** file from your workspace:
-   `agentic-ai-workspace/workflows/etiqa-marketer.json`
+   `agentic-ai-workspace/workflows/hafeez_bot/takaful/etiqa-marketer.json`
 
 ---
 

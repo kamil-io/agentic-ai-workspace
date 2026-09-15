@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const test = require('node:test');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
-const read = name => JSON.parse(fs.readFileSync(path.join(root, 'workflows', `kebundata-threads-${name}.json`)));
+const read = name => JSON.parse(fs.readFileSync(path.join(root, 'workflows', name === 'approval-handler' ? 'fahmi_bot/approvals' : 'hafeez_bot/threads', `kebundata-threads-${name}.json`)));
 const w = read('approval-handler');
 const node = name => w.nodes.find(n => n.name === name);
 test('PostgreSQL fixture exercises current workflow queries',()=>{
