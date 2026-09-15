@@ -6,7 +6,7 @@ The project supports KebunData smart-farming engagement and marketing operations
 
 ## Agent organisation
 
-See the [company agent organisation](docs/agent-organisation.md) for the proposed chart, confirmed names and role boundaries: Ahmad as CEO, ak.kamil as Pekebun Data (Developer & Farmer), Fahmi_bot for operations, Man_bot for finance and Salleh_bot for security. Pending name assignments and runtime migrations are recorded explicitly.
+See the [company agent organisation](docs/agent-organisation.md) for the proposed chart, confirmed names and role boundaries: Ahmad_ceo_bot as CEO, ak.kamil as Pekebun Data (Developer & Farmer), Fahmi_bot for operations, Alan_bot for sales and customer care, Hafeez_bot for marketing and content, Man_bot for finance and Salleh_bot for security. The Delivery & Automation assistant's name and runtime migrations remain pending.
 
 ## Architecture
 
