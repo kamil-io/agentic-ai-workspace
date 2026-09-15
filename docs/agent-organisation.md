@@ -9,12 +9,13 @@ flowchart TD
     CEO["Ahmad_ceo_bot — CEO"]
     CEO --> Ops["Fahmi_bot — Operations Coordinator"]
     CEO --> Kamil["ak.kamil — Pekebun Data<br/>Developer & Farmer"]
-    CEO --> Security["Salleh_bot — Security Reviewer"]
     Ops --> Sales["Alan_bot — Sales & Customer Care"]
     Ops --> Marketing["Hafeez_bot — Marketing & Content"]
-    Ops --> Finance["Man_bot — Finance & Cash Flow"]
     Kamil --> Delivery["Azri_bot — Delivery & Automation"]
-    Ops -. "Coordinates projects" .-> Delivery
+    Ops -. "Delivery coordination" .-> Delivery
+    Ops --> Finance["Man_bot — Finance & Cash Flow"]
+    CEO --> Security["Salleh_bot — Security Reviewer"]
+    Security -. "Independent security review" .-> Ops
     Security -. "Independent security review" .-> Delivery
 ```
 
