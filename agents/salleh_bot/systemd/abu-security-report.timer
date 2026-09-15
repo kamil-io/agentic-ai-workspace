@@ -1,5 +1,5 @@
 [Unit]
-Description=Run Abu security report weekly
+Description=Run Salleh_bot security report weekly
 
 [Timer]
 OnCalendar=Mon *-*-* 01:00:00 UTC

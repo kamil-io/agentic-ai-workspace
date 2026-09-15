@@ -9,7 +9,7 @@ Build maintainable marketing and customer-engagement workflows for Robot People 
 - n8n runs deterministic workflow steps.
 - PostgreSQL stores workflow state, approvals and execution evidence.
 - Hermes and Gemini provide reasoning and content assistance.
-- Abu provides read-only security review and remediation planning.
+- Salleh_bot provides read-only security review and remediation planning.
 - Odoo is the intended business system of record.
 - A named human approver controls external publishing.
 
