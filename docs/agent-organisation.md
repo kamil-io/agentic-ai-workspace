@@ -13,7 +13,7 @@ flowchart TD
     Ops --> Sales["Alan_bot — Sales & Customer Care"]
     Ops --> Marketing["Hafeez_bot — Marketing & Content"]
     Ops --> Finance["Man_bot — Finance & Cash Flow"]
-    Kamil --> Delivery["Delivery & Automation Assistant<br/>Name pending"]
+    Kamil --> Delivery["Azri_bot — Delivery & Automation"]
     Ops -. "Coordinates projects" .-> Delivery
     Security -. "Independent security review" .-> Delivery
 ```
@@ -29,11 +29,11 @@ Solid arrows show proposed reporting relationships. Dotted arrows show coordinat
 | ops.coordinator | Fahmi_bot | Coordinate work, prepare daily priorities, track commitments and escalate blocked tasks. |
 | revenue.sales | Alan_bot | Organise enquiries, qualify leads and prepare follow-ups, appointments and proposals. |
 | growth.marketing | Hafeez_bot | Prepare campaigns, content and customer evidence for review. |
-| delivery.engineering | Pending | Assist ak.kamil with implementation, testing, documentation and support. |
+| delivery.engineering | Azri_bot | Assist ak.kamil with implementation, testing, documentation and support. |
 | finance.cashflow | Man_bot | Track collections and costs, prepare cash-flow forecasts and flag overdue invoices. |
 | security.review | Salleh_bot | Review security evidence and recommend remediation independently of delivery. |
 
-Confirmed on 15 September 2026: Ahmad_ceo_bot is CEO, Alan_bot handles Sales & Customer Care, and Hafeez_bot handles Marketing & Content. Only the Delivery & Automation assistant's name remains pending.
+Confirmed on 15 September 2026: Ahmad_ceo_bot is CEO, Alan_bot handles Sales & Customer Care, Hafeez_bot handles Marketing & Content, and Azri_bot handles Delivery & Automation.
 
 ## Identity transitions
 
