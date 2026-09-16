@@ -21,7 +21,7 @@
     },
     {
       "id": "rpr-2",
-      "name": "Validate Telegram Review",
+      "name": "Parse Telegram Review Update",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -29,47 +29,80 @@
         300
       ],
       "parameters": {
-        "jsCode": "const raw=$input.first().json;\nconst cb=(raw.body||raw).callback_query;\nconst match=/^rp_(approve|reject|edit)_([1-9]\\d*)$/.exec(cb?.data||'');\nconst expectedReviewerId='YOUR_TELEGRAM_REVIEWER_ID';\nconst expectedChatId='YOUR_TELEGRAM_CHAT_ID';\nconst reviewerId=String(cb?.from?.id||'');\nconst chatId=String(cb?.message?.chat?.id||'');\nconst messageId=Number(cb?.message?.message_id);\nif(!match||!cb?.id||reviewerId!==expectedReviewerId||chatId!==expectedChatId||!Number.isSafeInteger(messageId)||messageId<1)return [];\nreturn [{json:{action:match[1],draftId:match[2],reviewerId,chatId,messageId,callbackQueryId:cb.id}}];"
+        "jsCode": "const raw=$input.first().json;\nconst update=raw.body||raw;\nconst expectedReviewerId='YOUR_TELEGRAM_REVIEWER_ID';\nconst expectedChatId='YOUR_TELEGRAM_CHAT_ID';\nconst cb=update.callback_query;\nif(cb){\n const match=/^rp_(approve|reject|edit)_([1-9]\\d*)$/.exec(cb.data||'');\n const reviewerId=String(cb.from?.id||''),chatId=String(cb.message?.chat?.id||''),messageId=Number(cb.message?.message_id);\n if(!match||!cb.id||reviewerId!==expectedReviewerId||chatId!==expectedChatId||!Number.isSafeInteger(messageId)||messageId<1)return [];\n return [{json:{kind:'callback',action:match[1],draftId:match[2],reviewerId,chatId,messageId,callbackQueryId:cb.id}}];\n}\nconst message=update.message;\nif(message){\n const reviewerId=String(message.from?.id||''),chatId=String(message.chat?.id||''),replyToMessageId=Number(message.reply_to_message?.message_id),editedText=String(message.text||'').trim();\n if(reviewerId!==expectedReviewerId||chatId!==expectedChatId||!Number.isSafeInteger(replyToMessageId)||replyToMessageId<1||!editedText||[...editedText].length>500)return [];\n return [{json:{kind:'edit_reply',reviewerId,chatId,replyToMessageId,editedText}}];\n}\nreturn [];"
       }
     },
     {
       "id": "rpr-3",
+      "name": "Is Callback",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rpr-callback-condition",
+              "leftValue": "={{ $json.kind }}",
+              "rightValue": "callback",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "rpr-4",
       "name": "Record Review Decision",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        480,
+        720,
         300
       ],
       "parameters": {
         "operation": "executeQuery",
         "query": "UPDATE public.robot_people_content_drafts\nSET review_status=CASE $1 WHEN 'approve' THEN 'APPROVED' WHEN 'reject' THEN 'REJECTED' WHEN 'edit' THEN 'EDIT_REQUESTED' END,\n reviewed_by_telegram_user_id=$2,\n reviewed_at=now(),\n updated_at=now()\nWHERE id=$3::bigint\n AND telegram_message_id=$4::bigint\n AND status='REVIEW_SENT'\n AND review_status='PENDING'\n AND $1 IN ('approve','reject','edit')\nRETURNING id,review_status;",
         "options": {
-          "queryReplacement": "={{ [ $('Validate Telegram Review').first().json.action, $('Validate Telegram Review').first().json.reviewerId, $('Validate Telegram Review').first().json.draftId, $('Validate Telegram Review').first().json.messageId ] }}"
+          "queryReplacement": "={{ [ $('Parse Telegram Review Update').first().json.action, $('Parse Telegram Review Update').first().json.reviewerId, $('Parse Telegram Review Update').first().json.draftId, $('Parse Telegram Review Update').first().json.messageId ] }}"
         }
       },
       "alwaysOutputData": true
     },
     {
-      "id": "rpr-4",
+      "id": "rpr-5",
       "name": "Verify Review Decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        720,
+        960,
         300
       ],
       "parameters": {
-        "jsCode": "const request=$('Validate Telegram Review').first().json;\nconst row=$input.first()?.json||{};\nconst expected={approve:'APPROVED',reject:'REJECTED',edit:'EDIT_REQUESTED'}[request.action];\nif(String(row.id||'')!==String(request.draftId)||row.review_status!==expected)throw new Error('Review decision is invalid, stale or already used');\nreturn [{json:{...request,reviewStatus:row.review_status}}];"
+        "jsCode": "const request=$('Parse Telegram Review Update').first().json;\nconst row=$input.first()?.json||{};\nconst expected={approve:'APPROVED',reject:'REJECTED',edit:'EDIT_REQUESTED'}[request.action];\nif(String(row.id||'')!==String(request.draftId)||row.review_status!==expected)throw new Error('Review decision is invalid, stale or already used');\nreturn [{json:{...request,reviewStatus:row.review_status}}];"
       }
     },
     {
-      "id": "rpr-5",
+      "id": "rpr-6",
       "name": "Answer Telegram Review",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        960,
+        1200,
         300
       ],
       "parameters": {
@@ -81,6 +114,109 @@
           "show_alert": true
         }
       }
+    },
+    {
+      "id": "rpr-7",
+      "name": "Store Manual Edit",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.robot_people_content_drafts\nSET draft_text=$1,\n review_status='PENDING',\n telegram_message_id=NULL,\n reviewed_by_telegram_user_id=$2,\n reviewed_at=now(),\n updated_at=now()\nWHERE telegram_message_id=$3::bigint\n AND status='REVIEW_SENT'\n AND review_status='EDIT_REQUESTED'\nRETURNING id,draft_text;",
+        "options": {
+          "queryReplacement": "={{ [ $('Parse Telegram Review Update').first().json.editedText, $('Parse Telegram Review Update').first().json.reviewerId, $('Parse Telegram Review Update').first().json.replyToMessageId ] }}"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "rpr-8",
+      "name": "Verify Manual Edit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const request=$('Parse Telegram Review Update').first().json;\nconst row=$input.first()?.json||{};\nif(!row.id||row.draft_text!==request.editedText)throw new Error('Edit request is invalid, stale or already used');\nreturn [{json:{...request,draftId:row.id,draftText:row.draft_text}}];"
+      }
+    },
+    {
+      "id": "rpr-9",
+      "name": "Send Edited Draft for Review",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ 'Hafeez_bot | Robot People | Edited draft #' + $json.draftId + '\\n\\n' + $json.draftText.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') + '\\n\\nYour exact edit is stored. Nothing will be published until a separate publishing workflow is approved.' }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false
+        },
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Approve draft",
+                    "additionalFields": {
+                      "callback_data": "=rp_approve_{{ $json.draftId }}"
+                    }
+                  },
+                  {
+                    "text": "❌ Reject",
+                    "additionalFields": {
+                      "callback_data": "=rp_reject_{{ $json.draftId }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✏️ Request edit",
+                    "additionalFields": {
+                      "callback_data": "=rp_edit_{{ $json.draftId }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rpr-10",
+      "name": "Record Edited Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2160,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.robot_people_content_drafts\nSET telegram_message_id=$1::bigint,updated_at=now()\nWHERE id=$2::bigint AND status='REVIEW_SENT' AND review_status='PENDING' AND telegram_message_id IS NULL\nRETURNING id,telegram_message_id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.result.message_id, $('Verify Manual Edit').first().json.draftId ] }}"
+        }
+      }
     }
   ],
   "connections": {
@@ -88,18 +224,36 @@
       "main": [
         [
           {
-            "node": "Validate Telegram Review",
+            "node": "Parse Telegram Review Update",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validate Telegram Review": {
+    "Parse Telegram Review Update": {
+      "main": [
+        [
+          {
+            "node": "Is Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Callback": {
       "main": [
         [
           {
             "node": "Record Review Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Store Manual Edit",
             "type": "main",
             "index": 0
           }
@@ -122,6 +276,39 @@
         [
           {
             "node": "Answer Telegram Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Manual Edit": {
+      "main": [
+        [
+          {
+            "node": "Verify Manual Edit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Manual Edit": {
+      "main": [
+        [
+          {
+            "node": "Send Edited Draft for Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Edited Draft for Review": {
+      "main": [
+        [
+          {
+            "node": "Record Edited Message",
             "type": "main",
             "index": 0
           }
