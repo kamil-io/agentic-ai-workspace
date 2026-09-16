@@ -63,7 +63,7 @@
       ],
       "parameters": {
         "operation": "executeQuery",
-        "query": "CREATE TABLE IF NOT EXISTS public.robot_people_content_drafts (\n id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n draft_date DATE NOT NULL UNIQUE,\n brand TEXT NOT NULL CHECK (brand = 'Robot People Industries'),\n channel TEXT NOT NULL CHECK (channel = 'threads'),\n topic TEXT NOT NULL,\n draft_text TEXT,\n status TEXT NOT NULL CHECK (status IN ('GENERATING','PENDING_REVIEW','REVIEW_SENT','FAILED')),\n execution_id TEXT NOT NULL,\n created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n updated_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\nALTER TABLE public.robot_people_content_drafts\n ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'PENDING' CHECK (review_status IN ('PENDING','APPROVED','REJECTED','EDIT_REQUESTED')),\n ADD COLUMN IF NOT EXISTS telegram_message_id BIGINT,\n ADD COLUMN IF NOT EXISTS reviewed_by_telegram_user_id TEXT,\n ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;\nSELECT current_database() AS database_name;",
+        "query": "CREATE TABLE IF NOT EXISTS public.robot_people_content_drafts (\n id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n draft_date DATE NOT NULL UNIQUE,\n brand TEXT NOT NULL CHECK (brand = 'Robot People Industries'),\n channel TEXT NOT NULL CHECK (channel = 'threads'),\n topic TEXT NOT NULL,\n draft_text TEXT,\n status TEXT NOT NULL CHECK (status IN ('GENERATING','PENDING_REVIEW','REVIEW_SENT','FAILED')),\n execution_id TEXT NOT NULL,\n created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n updated_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\nALTER TABLE public.robot_people_content_drafts\n ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'PENDING' CHECK (review_status IN ('PENDING','APPROVED','REJECTED','EDIT_REQUESTED')),\n ADD COLUMN IF NOT EXISTS telegram_message_id BIGINT,\n ADD COLUMN IF NOT EXISTS reviewed_by_telegram_user_id TEXT,\n ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ,\n ADD COLUMN IF NOT EXISTS publish_enabled BOOLEAN NOT NULL DEFAULT false,\n ADD COLUMN IF NOT EXISTS publish_status TEXT NOT NULL DEFAULT 'UNPUBLISHED' CHECK (publish_status IN ('UNPUBLISHED','PUBLISHING','PUBLISHED','FAILED','PUBLISH_UNKNOWN')),\n ADD COLUMN IF NOT EXISTS publish_execution_id TEXT,\n ADD COLUMN IF NOT EXISTS threads_container_id TEXT,\n ADD COLUMN IF NOT EXISTS threads_post_id TEXT,\n ADD COLUMN IF NOT EXISTS publish_attempted_at TIMESTAMPTZ,\n ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ,\n ADD COLUMN IF NOT EXISTS publish_error_code TEXT,\n ADD COLUMN IF NOT EXISTS publish_error_message TEXT;\nSELECT current_database() AS database_name;",
         "options": {}
       }
     },
@@ -78,7 +78,7 @@
       ],
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO public.robot_people_content_drafts(draft_date,brand,channel,topic,status,execution_id)\nVALUES ($1::date,$2,$3,$4,'GENERATING',$5)\nON CONFLICT (draft_date) DO UPDATE SET\n topic=EXCLUDED.topic,\n draft_text=NULL,\n status='GENERATING',\n review_status='PENDING',\n telegram_message_id=NULL,\n reviewed_by_telegram_user_id=NULL,\n reviewed_at=NULL,\n execution_id=EXCLUDED.execution_id,\n updated_at=now()\nWHERE robot_people_content_drafts.status='FAILED'\nRETURNING id,draft_date;",
+        "query": "INSERT INTO public.robot_people_content_drafts(draft_date,brand,channel,topic,status,execution_id,publish_enabled)\nVALUES ($1::date,$2,$3,$4,'GENERATING',$5,true)\nON CONFLICT (draft_date) DO UPDATE SET\n topic=EXCLUDED.topic,\n draft_text=NULL,\n status='GENERATING',\n review_status='PENDING',\n telegram_message_id=NULL,\n reviewed_by_telegram_user_id=NULL,\n reviewed_at=NULL,\n publish_enabled=true,\n publish_status='UNPUBLISHED',\n publish_execution_id=NULL,\n threads_container_id=NULL,\n threads_post_id=NULL,\n publish_attempted_at=NULL,\n published_at=NULL,\n publish_error_code=NULL,\n publish_error_message=NULL,\n execution_id=EXCLUDED.execution_id,\n updated_at=now()\nWHERE robot_people_content_drafts.status='FAILED'\nRETURNING id,draft_date;",
         "options": {
           "queryReplacement": "={{ [ $('Prepare Robot People Brief').first().json.draftDate, $('Prepare Robot People Brief').first().json.brand, 'threads', $('Prepare Robot People Brief').first().json.topic, $execution.id ] }}"
         }
@@ -152,7 +152,7 @@
         "resource": "message",
         "operation": "sendMessage",
         "chatId": "={{ $('Prepare Robot People Brief').first().json.chatId }}",
-        "text": "={{ 'Hafeez_bot | Robot People | Draft #' + $json.id + '\\n\\n' + $json.draft_text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') + '\\n\\nReview only — nothing will be published. Choose a review action below.' }}",
+        "text": "={{ 'Hafeez_bot | Robot People | Draft #' + $json.id + '\\n\\n' + $json.draft_text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') + '\\n\\nReview only. Approve to publish this exact text once to @robot.people.' }}",
         "additionalFields": {
           "parse_mode": "HTML",
           "appendAttribution": false
@@ -164,7 +164,7 @@
               "row": {
                 "buttons": [
                   {
-                    "text": "✅ Approve draft",
+                    "text": "✅ Approve & publish",
                     "additionalFields": {
                       "callback_data": "=rp_approve_{{ $json.id }}"
                     }

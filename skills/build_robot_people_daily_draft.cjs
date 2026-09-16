@@ -27,10 +27,19 @@ ALTER TABLE public.robot_people_content_drafts
  ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'PENDING' CHECK (review_status IN ('PENDING','APPROVED','REJECTED','EDIT_REQUESTED')),
  ADD COLUMN IF NOT EXISTS telegram_message_id BIGINT,
  ADD COLUMN IF NOT EXISTS reviewed_by_telegram_user_id TEXT,
- ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+ ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ,
+ ADD COLUMN IF NOT EXISTS publish_enabled BOOLEAN NOT NULL DEFAULT false,
+ ADD COLUMN IF NOT EXISTS publish_status TEXT NOT NULL DEFAULT 'UNPUBLISHED' CHECK (publish_status IN ('UNPUBLISHED','PUBLISHING','PUBLISHED','FAILED','PUBLISH_UNKNOWN')),
+ ADD COLUMN IF NOT EXISTS publish_execution_id TEXT,
+ ADD COLUMN IF NOT EXISTS threads_container_id TEXT,
+ ADD COLUMN IF NOT EXISTS threads_post_id TEXT,
+ ADD COLUMN IF NOT EXISTS publish_attempted_at TIMESTAMPTZ,
+ ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ,
+ ADD COLUMN IF NOT EXISTS publish_error_code TEXT,
+ ADD COLUMN IF NOT EXISTS publish_error_message TEXT;
 SELECT current_database() AS database_name;`,options:{}},2.6);
-add('Claim Daily Draft','postgres',{operation:'executeQuery',query:`INSERT INTO public.robot_people_content_drafts(draft_date,brand,channel,topic,status,execution_id)
-VALUES ($1::date,$2,$3,$4,'GENERATING',$5)
+add('Claim Daily Draft','postgres',{operation:'executeQuery',query:`INSERT INTO public.robot_people_content_drafts(draft_date,brand,channel,topic,status,execution_id,publish_enabled)
+VALUES ($1::date,$2,$3,$4,'GENERATING',$5,true)
 ON CONFLICT (draft_date) DO UPDATE SET
  topic=EXCLUDED.topic,
  draft_text=NULL,
@@ -39,6 +48,15 @@ ON CONFLICT (draft_date) DO UPDATE SET
  telegram_message_id=NULL,
  reviewed_by_telegram_user_id=NULL,
  reviewed_at=NULL,
+ publish_enabled=true,
+ publish_status='UNPUBLISHED',
+ publish_execution_id=NULL,
+ threads_container_id=NULL,
+ threads_post_id=NULL,
+ publish_attempted_at=NULL,
+ published_at=NULL,
+ publish_error_code=NULL,
+ publish_error_message=NULL,
  execution_id=EXCLUDED.execution_id,
  updated_at=now()
 WHERE robot_people_content_drafts.status='FAILED'
@@ -58,7 +76,7 @@ if(/\\b(deploy|lead triage|classify|intent|priority|PIC|edge cases|execute|stand
 return [{json:{text}}];`});
 add('Store Exact Draft','postgres',{operation:'executeQuery',query:`UPDATE public.robot_people_content_drafts SET draft_text=$1,status='PENDING_REVIEW',updated_at=now()
 WHERE id=$2::bigint AND execution_id=$3 AND status='GENERATING' RETURNING id,draft_text,draft_date;`,options:{queryReplacement:"={{ [ $json.text, $('Claim Daily Draft').first().json.id, $execution.id ] }}"}},2.6);
-add('Send Draft for Human Review','telegram',{resource:'message',operation:'sendMessage',chatId:"={{ $('Prepare Robot People Brief').first().json.chatId }}",text:"={{ 'Hafeez_bot | Robot People | Draft #' + $json.id + '\\n\\n' + $json.draft_text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') + '\\n\\nReview only — nothing will be published. Choose a review action below.' }}",additionalFields:{parse_mode:'HTML',appendAttribution:false},replyMarkup:'inlineKeyboard',inlineKeyboard:{rows:[{row:{buttons:[{text:'✅ Approve draft',additionalFields:{callback_data:"=rp_approve_{{ $json.id }}"}},{text:'❌ Reject',additionalFields:{callback_data:"=rp_reject_{{ $json.id }}"}}]}},{row:{buttons:[{text:'✏️ Request edit',additionalFields:{callback_data:"=rp_edit_{{ $json.id }}"}}]}}]}},1.2);
+add('Send Draft for Human Review','telegram',{resource:'message',operation:'sendMessage',chatId:"={{ $('Prepare Robot People Brief').first().json.chatId }}",text:"={{ 'Hafeez_bot | Robot People | Draft #' + $json.id + '\\n\\n' + $json.draft_text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') + '\\n\\nReview only. Approve to publish this exact text once to @robot.people.' }}",additionalFields:{parse_mode:'HTML',appendAttribution:false},replyMarkup:'inlineKeyboard',inlineKeyboard:{rows:[{row:{buttons:[{text:'✅ Approve & publish',additionalFields:{callback_data:"=rp_approve_{{ $json.id }}"}},{text:'❌ Reject',additionalFields:{callback_data:"=rp_reject_{{ $json.id }}"}}]}},{row:{buttons:[{text:'✏️ Request edit',additionalFields:{callback_data:"=rp_edit_{{ $json.id }}"}}]}}]}},1.2);
 add('Record Review Delivery','postgres',{operation:'executeQuery',query:`UPDATE public.robot_people_content_drafts SET status='REVIEW_SENT',review_status='PENDING',telegram_message_id=$3::bigint,updated_at=now()
 WHERE id=$1::bigint AND execution_id=$2 AND status='PENDING_REVIEW' RETURNING id,status,review_status,telegram_message_id;`,options:{queryReplacement:"={{ [ $('Claim Daily Draft').first().json.id, $execution.id, $json.result.message_id ] }}"}},2.6);
 add('Record Failure','postgres',{operation:'executeQuery',query:`UPDATE public.robot_people_content_drafts SET status='FAILED',updated_at=now()

@@ -19,15 +19,19 @@ test('invalid or blocked model output stops rather than using replacement conten
 test('daily claim is unique and persistence precedes review delivery',()=>{
  assert.match(node('Ensure Draft Store').parameters.query,/draft_date DATE NOT NULL UNIQUE/);
  assert.match(node('Ensure Draft Store').parameters.query,/review_status TEXT NOT NULL DEFAULT 'PENDING'/);
+ assert.match(node('Ensure Draft Store').parameters.query,/publish_enabled BOOLEAN NOT NULL DEFAULT false/);
+ assert.match(node('Ensure Draft Store').parameters.query,/publish_status TEXT NOT NULL DEFAULT 'UNPUBLISHED'/);
  const claim=node('Claim Daily Draft').parameters.query;
  assert.match(claim,/ON CONFLICT \(draft_date\) DO UPDATE/);
  assert.match(claim,/WHERE robot_people_content_drafts\.status='FAILED'/);
  assert.match(claim,/execution_id=EXCLUDED\.execution_id/);
+ assert.match(claim,/publish_enabled=true/);
  assert.equal(w.connections['Store Exact Draft'].main[0][0].node,'Send Draft for Human Review');
  assert.match(node('Store Exact Draft').parameters.query,/execution_id=\$3/);
  assert.match(node('Send Draft for Human Review').parameters.text,/\$json.draft_text/);
+ assert.match(JSON.stringify(node('Send Draft for Human Review').parameters.inlineKeyboard),/Approve & publish/);
  assert.equal(node('Send Draft for Human Review').parameters.replyMarkup,'inlineKeyboard');
- assert.deepEqual(node('Send Draft for Human Review').parameters.inlineKeyboard.rows.flatMap(r=>r.row.buttons.map(b=>b.text)),['✅ Approve draft','❌ Reject','✏️ Request edit']);
+ assert.deepEqual(node('Send Draft for Human Review').parameters.inlineKeyboard.rows.flatMap(r=>r.row.buttons.map(b=>b.text)),['✅ Approve & publish','❌ Reject','✏️ Request edit']);
  assert.match(node('Record Review Delivery').parameters.query,/telegram_message_id=\$3::bigint/);
  assert.equal(node('Send Draft for Human Review').onError,'continueErrorOutput');
  assert.equal(w.connections['Record Failure'].main[0][0].node,'Stop Failed Run');
