@@ -1,0 +1,137 @@
+{
+  "name": "Fahmi_bot | Robot People | Review Decisions",
+  "nodes": [
+    {
+      "id": "rpr-1",
+      "name": "Telegram Review Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "robot-people-review",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "webhookId": "c9f689d0-0ccb-470f-a95f-5bc01a52b39c"
+    },
+    {
+      "id": "rpr-2",
+      "name": "Validate Telegram Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const raw=$input.first().json;\nconst cb=(raw.body||raw).callback_query;\nconst match=/^rp_(approve|reject|edit)_([1-9]\\d*)$/.exec(cb?.data||'');\nconst expectedReviewerId='YOUR_TELEGRAM_REVIEWER_ID';\nconst expectedChatId='YOUR_TELEGRAM_CHAT_ID';\nconst reviewerId=String(cb?.from?.id||'');\nconst chatId=String(cb?.message?.chat?.id||'');\nconst messageId=Number(cb?.message?.message_id);\nif(!match||!cb?.id||reviewerId!==expectedReviewerId||chatId!==expectedChatId||!Number.isSafeInteger(messageId)||messageId<1)return [];\nreturn [{json:{action:match[1],draftId:match[2],reviewerId,chatId,messageId,callbackQueryId:cb.id}}];"
+      }
+    },
+    {
+      "id": "rpr-3",
+      "name": "Record Review Decision",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.robot_people_content_drafts\nSET review_status=CASE $1 WHEN 'approve' THEN 'APPROVED' WHEN 'reject' THEN 'REJECTED' WHEN 'edit' THEN 'EDIT_REQUESTED' END,\n reviewed_by_telegram_user_id=$2,\n reviewed_at=now(),\n updated_at=now()\nWHERE id=$3::bigint\n AND telegram_message_id=$4::bigint\n AND status='REVIEW_SENT'\n AND review_status='PENDING'\n AND $1 IN ('approve','reject','edit')\nRETURNING id,review_status;",
+        "options": {
+          "queryReplacement": "={{ [ $('Validate Telegram Review').first().json.action, $('Validate Telegram Review').first().json.reviewerId, $('Validate Telegram Review').first().json.draftId, $('Validate Telegram Review').first().json.messageId ] }}"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "rpr-4",
+      "name": "Verify Review Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const request=$('Validate Telegram Review').first().json;\nconst row=$input.first()?.json||{};\nconst expected={approve:'APPROVED',reject:'REJECTED',edit:'EDIT_REQUESTED'}[request.action];\nif(String(row.id||'')!==String(request.draftId)||row.review_status!==expected)throw new Error('Review decision is invalid, stale or already used');\nreturn [{json:{...request,reviewStatus:row.review_status}}];"
+      }
+    },
+    {
+      "id": "rpr-5",
+      "name": "Answer Telegram Review",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        300
+      ],
+      "parameters": {
+        "resource": "callback",
+        "operation": "answerQuery",
+        "queryId": "={{ $json.callbackQueryId }}",
+        "additionalFields": {
+          "text": "={{ $json.action === 'approve' ? '✅ Draft approved and recorded. Nothing was published.' : ($json.action === 'reject' ? '❌ Draft rejected and recorded.' : '✏️ Edit requested. Reply to the draft with your revised wording.') }}",
+          "show_alert": true
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Review Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Telegram Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Telegram Review": {
+      "main": [
+        [
+          {
+            "node": "Record Review Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Review Decision": {
+      "main": [
+        [
+          {
+            "node": "Verify Review Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Review Decision": {
+      "main": [
+        [
+          {
+            "node": "Answer Telegram Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kuala_Lumpur"
+  }
+}
