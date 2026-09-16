@@ -421,11 +421,31 @@
     },
     {
       "id": "rpr-22",
+      "name": "Send Publish Confirmation",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4620,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Verify Review Decision').first().json.chatId }}",
+        "text": "={{ '✅ Published to @robot.people.\\n\\nPost ID: ' + $('Verify Published Record').first().json.threadsPostId + '\\nCheck: https://www.threads.com/@robot.people' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "rpr-23",
       "name": "Record Prepublish Failure",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        4620,
+        4840,
         300
       ],
       "parameters": {
@@ -439,12 +459,12 @@
       "retryOnFail": false
     },
     {
-      "id": "rpr-23",
+      "id": "rpr-24",
       "name": "Answer Prepublish Failure",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        4840,
+        5060,
         300
       ],
       "parameters": {
@@ -458,12 +478,12 @@
       }
     },
     {
-      "id": "rpr-24",
+      "id": "rpr-25",
       "name": "Record Uncertain Publication",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        5060,
+        5280,
         300
       ],
       "parameters": {
@@ -477,12 +497,12 @@
       "retryOnFail": false
     },
     {
-      "id": "rpr-25",
+      "id": "rpr-26",
       "name": "Answer Uncertain Publication",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        5280,
+        5500,
         300
       ],
       "parameters": {
@@ -496,12 +516,12 @@
       }
     },
     {
-      "id": "rpr-26",
+      "id": "rpr-27",
       "name": "Store Manual Edit",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        5500,
+        5720,
         300
       ],
       "parameters": {
@@ -514,12 +534,12 @@
       "alwaysOutputData": true
     },
     {
-      "id": "rpr-27",
+      "id": "rpr-28",
       "name": "Verify Manual Edit",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5720,
+        5940,
         300
       ],
       "parameters": {
@@ -527,12 +547,12 @@
       }
     },
     {
-      "id": "rpr-28",
+      "id": "rpr-29",
       "name": "Send Edited Draft for Review",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        5940,
+        6160,
         300
       ],
       "parameters": {
@@ -582,12 +602,12 @@
       }
     },
     {
-      "id": "rpr-29",
+      "id": "rpr-30",
       "name": "Record Edited Message",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        6160,
+        6380,
         300
       ],
       "parameters": {
@@ -881,6 +901,11 @@
         [
           {
             "node": "Answer Publish Success",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Publish Confirmation",
             "type": "main",
             "index": 0
           }

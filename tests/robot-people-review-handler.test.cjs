@@ -24,6 +24,8 @@ test('publication is single-attempt and uncertain outcomes require reconciliatio
  assert.equal(w.connections['Publish to Threads'].main[1][0].node,'Record Uncertain Publication');
  assert.equal(w.connections['Validate Published ID'].main[1][0].node,'Record Uncertain Publication');
  assert.equal(w.connections['Mark Draft Published'].main[1][0].node,'Record Uncertain Publication');
+ assert(w.connections['Verify Published Record'].main[0].some(e=>e.node==='Send Publish Confirmation'));
+ assert.match(node('Send Publish Confirmation').parameters.text,/Published to @robot\.people/);
  assert.match(node('Record Uncertain Publication').parameters.query,/publish_status='PUBLISH_UNKNOWN'/);
  assert.match(node('Record Uncertain Publication').parameters.query,/publish_attempted_at IS NOT NULL/);
  assert.match(node('Record Prepublish Failure').parameters.query,/publish_attempted_at IS NULL/);

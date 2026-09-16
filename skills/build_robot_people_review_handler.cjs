@@ -71,6 +71,7 @@ WHERE id=$2::bigint AND publish_execution_id=$3 AND review_status='APPROVED'
 RETURNING id,threads_post_id,published_at;`,options:{queryReplacement:"={{ [ $json.id, $('Verify Review Decision').first().json.draftId, $execution.id ] }}"}},2.6,{alwaysOutputData:true,onError:'continueErrorOutput',retryOnFail:false});
 add('Verify Published Record','code',{jsCode:`const row=$input.first()?.json||{};if(String(row.id||'')!==String($('Verify Review Decision').first().json.draftId)||!/^\\d+$/.test(String(row.threads_post_id||''))||!row.published_at)throw new Error('Published post was not recorded');return [{json:{...$('Verify Review Decision').first().json,threadsPostId:String(row.threads_post_id)}}];`},2,{onError:'continueErrorOutput',retryOnFail:false});
 add('Answer Publish Success','telegram',{resource:'callback',operation:'answerQuery',queryId:'={{ $json.callbackQueryId }}',additionalFields:{text:"={{ '✅ Approved and published to @robot.people. Post ID: ' + $json.threadsPostId }}",show_alert:true}},1.2);
+add('Send Publish Confirmation','telegram',{resource:'message',operation:'sendMessage',chatId:"={{ $('Verify Review Decision').first().json.chatId }}",text:"={{ '✅ Published to @robot.people.\\n\\nPost ID: ' + $('Verify Published Record').first().json.threadsPostId + '\\nCheck: https://www.threads.com/@robot.people' }}",additionalFields:{appendAttribution:false}},1.2,{onError:'continueRegularOutput'});
 add('Record Prepublish Failure','postgres',{operation:'executeQuery',query:`UPDATE public.robot_people_content_drafts
 SET publish_status='FAILED',publish_error_code='PREPUBLISH_FAILED',
  publish_error_message='Approval recorded, but publishing did not start. Review the n8n execution before retrying.',updated_at=now()
@@ -121,7 +122,7 @@ const connections={
  'Publish to Threads':{main:[[edge('Validate Published ID')],[edge('Record Uncertain Publication')]]},
  'Validate Published ID':{main:[[edge('Mark Draft Published')],[edge('Record Uncertain Publication')]]},
  'Mark Draft Published':{main:[[edge('Verify Published Record')],[edge('Record Uncertain Publication')]]},
- 'Verify Published Record':{main:[[edge('Answer Publish Success')],[edge('Record Uncertain Publication')]]},
+ 'Verify Published Record':{main:[[edge('Answer Publish Success'),edge('Send Publish Confirmation')],[edge('Record Uncertain Publication')]]},
  'Record Prepublish Failure':{main:[[edge('Answer Prepublish Failure')]]},'Record Uncertain Publication':{main:[[edge('Answer Uncertain Publication')]]},
  'Store Manual Edit':{main:[[edge('Verify Manual Edit')]]},'Verify Manual Edit':{main:[[edge('Send Edited Draft for Review')]]},
  'Send Edited Draft for Review':{main:[[edge('Record Edited Message')]]},
