@@ -1,0 +1,983 @@
+{
+  "name": "Fahmi_bot | Robot People | Review & Threads Publisher",
+  "nodes": [
+    {
+      "id": "rpr-1",
+      "name": "Telegram Review Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "robot-people-review",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "webhookId": "c9f689d0-0ccb-470f-a95f-5bc01a52b39c"
+    },
+    {
+      "id": "rpr-2",
+      "name": "Parse Telegram Review Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const raw=$input.first().json;\nconst update=raw.body||raw;\nconst expectedReviewerId='YOUR_TELEGRAM_REVIEWER_ID';\nconst expectedChatId='YOUR_TELEGRAM_CHAT_ID';\nconst cb=update.callback_query;\nif(cb){\n const match=/^rp_(approve|reject|edit)_([1-9]\\d*)$/.exec(cb.data||'');\n const reviewerId=String(cb.from?.id||''),chatId=String(cb.message?.chat?.id||''),messageId=Number(cb.message?.message_id);\n if(!match||!cb.id||reviewerId!==expectedReviewerId||chatId!==expectedChatId||!Number.isSafeInteger(messageId)||messageId<1)return [];\n return [{json:{kind:'callback',action:match[1],draftId:match[2],reviewerId,chatId,messageId,callbackQueryId:cb.id,threadsUserId:'YOUR_THREADS_USER_ID'}}];\n}\nconst message=update.message;\nif(message){\n const reviewerId=String(message.from?.id||''),chatId=String(message.chat?.id||''),rawReplyId=Number(message.reply_to_message?.message_id),rawEditedText=String(message.text||'').trim();\n const replyToMessageId=Number.isSafeInteger(rawReplyId)&&rawReplyId>0?rawReplyId:null;\n const editedText=rawEditedText.replace(/\\n\\n— Admin$/u,'').trim()+'\\n\\n— Admin';\n if(reviewerId!==expectedReviewerId||chatId!==expectedChatId||!rawEditedText||rawEditedText.startsWith('/')||[...editedText].length>500)return [];\n return [{json:{kind:'edit_reply',reviewerId,chatId,replyToMessageId,editedText}}];\n}\nreturn [];"
+      }
+    },
+    {
+      "id": "rpr-3",
+      "name": "Is Callback",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rpr-callback-condition",
+              "leftValue": "={{ $json.kind }}",
+              "rightValue": "callback",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "rpr-4",
+      "name": "Record Review Decision",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.robot_people_content_drafts\nSET review_status=CASE $1 WHEN 'approve' THEN 'APPROVED' WHEN 'reject' THEN 'REJECTED' WHEN 'edit' THEN 'EDIT_REQUESTED' END,\n publish_status=CASE WHEN $1='approve' THEN 'PUBLISHING' ELSE publish_status END,\n publish_execution_id=CASE WHEN $1='approve' THEN $5 ELSE publish_execution_id END,\n reviewed_by_telegram_user_id=$2,reviewed_at=now(),updated_at=now()\nWHERE id=$3::bigint AND telegram_message_id=$4::bigint AND status='REVIEW_SENT' AND review_status='PENDING'\n AND $1 IN ('approve','reject','edit')\n AND ($1<>'approve' OR (publish_enabled=true AND publish_status='UNPUBLISHED' AND draft_text ~ '[^[:space:]]'))\nRETURNING id,review_status,draft_text,publish_status,publish_execution_id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Parse Telegram Review Update').first().json.action, $('Parse Telegram Review Update').first().json.reviewerId, $('Parse Telegram Review Update').first().json.draftId, $('Parse Telegram Review Update').first().json.messageId, $execution.id ] }}"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "rpr-5",
+      "name": "Verify Review Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const request=$('Parse Telegram Review Update').first().json;\nconst row=$input.first()?.json||{};\nconst expected={approve:'APPROVED',reject:'REJECTED',edit:'EDIT_REQUESTED'}[request.action];\nif(String(row.id||'')!==String(request.draftId)||row.review_status!==expected)throw new Error('Review decision is invalid, stale, blocked or already used');\nif(request.action==='approve'){\n if(row.publish_status!=='PUBLISHING'||String(row.publish_execution_id)!==String($execution.id))throw new Error('Publication claim owner mismatch');\n if(typeof row.draft_text!=='string'||!row.draft_text.trim()||[...row.draft_text].length>500)throw new Error('Stored draft is invalid');\n}\nreturn [{json:{...request,reviewStatus:row.review_status,publishStatus:row.publish_status,draftText:row.draft_text}}];"
+      }
+    },
+    {
+      "id": "rpr-6",
+      "name": "Is Publish Approved",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rpr-publish-condition",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "approve",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "rpr-7",
+      "name": "Answer Non-Publish Review",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "resource": "callback",
+        "operation": "answerQuery",
+        "queryId": "={{ $json.callbackQueryId }}",
+        "additionalFields": {
+          "text": "={{ $json.action === 'reject' ? '❌ Draft rejected.' : '✏️ Edit requested. Send your revised wording as your next message.' }}",
+          "show_alert": true
+        }
+      }
+    },
+    {
+      "id": "rpr-8",
+      "name": "Is Edit Requested",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rpr-edit-instruction-condition",
+              "leftValue": "={{ $('Verify Review Decision').first().json.action }}",
+              "rightValue": "edit",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "rpr-9",
+      "name": "Send Edit Instructions",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1760,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Verify Review Decision').first().json.chatId }}",
+        "text": "={{ '✏️ Edit mode opened for draft #' + $('Verify Review Decision').first().json.draftId + '. Send your corrected post text as your next normal message.' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      }
+    },
+    {
+      "id": "rpr-10",
+      "name": "Create Threads Text Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.threads.net/v1.0/{{ $json.threadsUserId }}/threads",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {media_type:\"TEXT\",text:$json.draftText} }}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth"
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "rpr-11",
+      "name": "Validate Container ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const d=$input.first().json;if(!/^\\d+$/.test(String(d.id||'')))throw new Error('Missing Threads container ID');return [{json:{id:String(d.id)}}];"
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "rpr-12",
+      "name": "Persist Container ID",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2420,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.robot_people_content_drafts\nSET threads_container_id=$1,updated_at=now()\nWHERE id=$2::bigint AND publish_execution_id=$3 AND review_status='APPROVED'\n AND publish_status='PUBLISHING' AND threads_container_id IS NULL AND publish_attempted_at IS NULL\nRETURNING id,threads_container_id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.id, $('Verify Review Decision').first().json.draftId, $execution.id ] }}"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "rpr-13",
+      "name": "Verify Persisted Container",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const row=$input.first()?.json||{};const expected=$('Validate Container ID').first().json.id;if(String(row.id||'')!==String($('Verify Review Decision').first().json.draftId)||String(row.threads_container_id||'')!==String(expected))throw new Error('Container state was not persisted');return [{json:{id:String(row.threads_container_id)}}];"
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "rpr-14",
+      "name": "Wait for Threads Ingestion",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2860,
+        300
+      ],
+      "parameters": {
+        "amount": 4,
+        "unit": "seconds"
+      },
+      "webhookId": "1f783c64-3754-47e2-aafd-robotpeoplepublish"
+    },
+    {
+      "id": "rpr-15",
+      "name": "Record Publish Attempt",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3080,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.robot_people_content_drafts\nSET publish_attempted_at=now(),updated_at=now()\nWHERE id=$2::bigint AND publish_execution_id=$3 AND review_status='APPROVED'\n AND publish_status='PUBLISHING' AND threads_container_id=$1 AND publish_attempted_at IS NULL\nRETURNING id,threads_container_id,publish_attempted_at;",
+        "options": {
+          "queryReplacement": "={{ [ $json.id, $('Verify Review Decision').first().json.draftId, $execution.id ] }}"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "rpr-16",
+      "name": "Verify Publish Attempt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const row=$input.first()?.json||{};if(String(row.id||'')!==String($('Verify Review Decision').first().json.draftId)||!/^\\d+$/.test(String(row.threads_container_id||''))||!row.publish_attempted_at)throw new Error('Publish attempt was not recorded');return [{json:{id:String(row.threads_container_id)}}];"
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "rpr-17",
+      "name": "Publish to Threads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3520,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.threads.net/v1.0/{{ $('Verify Review Decision').first().json.threadsUserId }}/threads_publish",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "creation_id",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth"
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "rpr-18",
+      "name": "Validate Published ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3740,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const d=$input.first().json;if(!/^\\d+$/.test(String(d.id||'')))throw new Error('Missing published Threads post ID');return [{json:{id:String(d.id)}}];"
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "rpr-19",
+      "name": "Mark Draft Published",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3960,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.robot_people_content_drafts\nSET publish_status='PUBLISHED',threads_post_id=$1,published_at=now(),updated_at=now(),publish_error_code=NULL,publish_error_message=NULL\nWHERE id=$2::bigint AND publish_execution_id=$3 AND review_status='APPROVED'\n AND publish_status='PUBLISHING' AND publish_attempted_at IS NOT NULL\nRETURNING id,threads_post_id,published_at;",
+        "options": {
+          "queryReplacement": "={{ [ $json.id, $('Verify Review Decision').first().json.draftId, $execution.id ] }}"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "rpr-20",
+      "name": "Verify Published Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4180,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const row=$input.first()?.json||{};if(String(row.id||'')!==String($('Verify Review Decision').first().json.draftId)||!/^\\d+$/.test(String(row.threads_post_id||''))||!row.published_at)throw new Error('Published post was not recorded');return [{json:{...$('Verify Review Decision').first().json,threadsPostId:String(row.threads_post_id)}}];"
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "rpr-21",
+      "name": "Answer Publish Success",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4400,
+        300
+      ],
+      "parameters": {
+        "resource": "callback",
+        "operation": "answerQuery",
+        "queryId": "={{ $json.callbackQueryId }}",
+        "additionalFields": {
+          "text": "={{ '✅ Approved and published to @robot.people. Post ID: ' + $json.threadsPostId }}",
+          "show_alert": true
+        }
+      }
+    },
+    {
+      "id": "rpr-22",
+      "name": "Send Publish Confirmation",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4620,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Verify Review Decision').first().json.chatId }}",
+        "text": "={{ '✅ Published to @robot.people.\\n\\nPost ID: ' + $('Verify Published Record').first().json.threadsPostId + '\\nCheck: https://www.threads.com/@robot.people' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "rpr-23",
+      "name": "Record Prepublish Failure",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4840,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.robot_people_content_drafts\nSET publish_status='FAILED',publish_error_code='PREPUBLISH_FAILED',\n publish_error_message='Approval recorded, but publishing did not start. Review the n8n execution before retrying.',updated_at=now()\nWHERE id=$1::bigint AND publish_execution_id=$2 AND review_status='APPROVED'\n AND publish_status='PUBLISHING' AND publish_attempted_at IS NULL\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Verify Review Decision').first().json.draftId, $execution.id ] }}"
+        }
+      },
+      "alwaysOutputData": true,
+      "retryOnFail": false
+    },
+    {
+      "id": "rpr-24",
+      "name": "Answer Prepublish Failure",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        5060,
+        300
+      ],
+      "parameters": {
+        "resource": "callback",
+        "operation": "answerQuery",
+        "queryId": "={{ $('Verify Review Decision').first().json.callbackQueryId }}",
+        "additionalFields": {
+          "text": "⚠️ Approval recorded, but publishing did not start. Check the n8n execution.",
+          "show_alert": true
+        }
+      }
+    },
+    {
+      "id": "rpr-25",
+      "name": "Record Uncertain Publication",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        5280,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.robot_people_content_drafts\nSET publish_status='PUBLISH_UNKNOWN',publish_error_code='MANUAL_RECONCILIATION_REQUIRED',\n publish_error_message='Publication may have reached Threads. Verify @robot.people before any retry.',updated_at=now()\nWHERE id=$1::bigint AND publish_execution_id=$2 AND review_status='APPROVED'\n AND publish_status='PUBLISHING' AND publish_attempted_at IS NOT NULL\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Verify Review Decision').first().json.draftId, $execution.id ] }}"
+        }
+      },
+      "alwaysOutputData": true,
+      "retryOnFail": false
+    },
+    {
+      "id": "rpr-26",
+      "name": "Answer Uncertain Publication",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        5500,
+        300
+      ],
+      "parameters": {
+        "resource": "callback",
+        "operation": "answerQuery",
+        "queryId": "={{ $('Verify Review Decision').first().json.callbackQueryId }}",
+        "additionalFields": {
+          "text": "⚠️ Publication outcome is uncertain. Do not retry until @robot.people is checked.",
+          "show_alert": true
+        }
+      }
+    },
+    {
+      "id": "rpr-27",
+      "name": "Store Manual Edit",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        5720,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH candidates AS (\n SELECT id FROM public.robot_people_content_drafts\n WHERE status='REVIEW_SENT' AND review_status='EDIT_REQUESTED' AND publish_status='UNPUBLISHED'\n  AND ($3::bigint IS NULL OR telegram_message_id=$3::bigint)\n ORDER BY reviewed_at DESC\n LIMIT 2\n), chosen AS (\n SELECT min(id) AS id FROM candidates HAVING count(*)=1\n)\nUPDATE public.robot_people_content_drafts AS draft\nSET draft_text=$1,review_status='PENDING',telegram_message_id=NULL,reviewed_by_telegram_user_id=$2,reviewed_at=now(),\n publish_enabled=true,publish_status='UNPUBLISHED',publish_execution_id=NULL,threads_container_id=NULL,threads_post_id=NULL,\n publish_attempted_at=NULL,published_at=NULL,publish_error_code=NULL,publish_error_message=NULL,updated_at=now()\nFROM chosen WHERE draft.id=chosen.id\nRETURNING draft.id,draft.draft_text;",
+        "options": {
+          "queryReplacement": "={{ [ $('Parse Telegram Review Update').first().json.editedText, $('Parse Telegram Review Update').first().json.reviewerId, $('Parse Telegram Review Update').first().json.replyToMessageId ] }}"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "rpr-28",
+      "name": "Verify Manual Edit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5940,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const request=$('Parse Telegram Review Update').first().json;const row=$input.first()?.json||{};if(!row.id||row.draft_text!==request.editedText)throw new Error('Edit request is invalid, stale or already used');return [{json:{...request,draftId:row.id,draftText:row.draft_text}}];"
+      }
+    },
+    {
+      "id": "rpr-29",
+      "name": "Send Edited Draft for Review",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        6160,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ 'Hafeez_bot | Robot People | Edited draft #' + $json.draftId + '\\n\\n' + $json.draftText.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') + '\\n\\nYour exact edit is stored. Approve to publish this text once to @robot.people.' }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false
+        },
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Approve & publish",
+                    "additionalFields": {
+                      "callback_data": "=rp_approve_{{ $json.draftId }}"
+                    }
+                  },
+                  {
+                    "text": "❌ Reject",
+                    "additionalFields": {
+                      "callback_data": "=rp_reject_{{ $json.draftId }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✏️ Request edit",
+                    "additionalFields": {
+                      "callback_data": "=rp_edit_{{ $json.draftId }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rpr-30",
+      "name": "Record Edited Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        6380,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.robot_people_content_drafts\nSET telegram_message_id=$1::bigint,updated_at=now()\nWHERE id=$2::bigint AND status='REVIEW_SENT' AND review_status='PENDING' AND publish_status='UNPUBLISHED' AND telegram_message_id IS NULL\nRETURNING id,telegram_message_id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.result.message_id, $('Verify Manual Edit').first().json.draftId ] }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Review Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Telegram Review Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Telegram Review Update": {
+      "main": [
+        [
+          {
+            "node": "Is Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Callback": {
+      "main": [
+        [
+          {
+            "node": "Record Review Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Store Manual Edit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Review Decision": {
+      "main": [
+        [
+          {
+            "node": "Verify Review Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Review Decision": {
+      "main": [
+        [
+          {
+            "node": "Is Publish Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Publish Approved": {
+      "main": [
+        [
+          {
+            "node": "Create Threads Text Container",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Answer Non-Publish Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer Non-Publish Review": {
+      "main": [
+        [
+          {
+            "node": "Is Edit Requested",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Edit Requested": {
+      "main": [
+        [
+          {
+            "node": "Send Edit Instructions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Create Threads Text Container": {
+      "main": [
+        [
+          {
+            "node": "Validate Container ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Prepublish Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Container ID": {
+      "main": [
+        [
+          {
+            "node": "Persist Container ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Prepublish Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Container ID": {
+      "main": [
+        [
+          {
+            "node": "Verify Persisted Container",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Prepublish Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Persisted Container": {
+      "main": [
+        [
+          {
+            "node": "Wait for Threads Ingestion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Prepublish Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Threads Ingestion": {
+      "main": [
+        [
+          {
+            "node": "Record Publish Attempt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Publish Attempt": {
+      "main": [
+        [
+          {
+            "node": "Verify Publish Attempt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Prepublish Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Publish Attempt": {
+      "main": [
+        [
+          {
+            "node": "Publish to Threads",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Prepublish Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish to Threads": {
+      "main": [
+        [
+          {
+            "node": "Validate Published ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Uncertain Publication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Published ID": {
+      "main": [
+        [
+          {
+            "node": "Mark Draft Published",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Uncertain Publication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Draft Published": {
+      "main": [
+        [
+          {
+            "node": "Verify Published Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Uncertain Publication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Published Record": {
+      "main": [
+        [
+          {
+            "node": "Answer Publish Success",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Publish Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Uncertain Publication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Prepublish Failure": {
+      "main": [
+        [
+          {
+            "node": "Answer Prepublish Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Uncertain Publication": {
+      "main": [
+        [
+          {
+            "node": "Answer Uncertain Publication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Manual Edit": {
+      "main": [
+        [
+          {
+            "node": "Verify Manual Edit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Manual Edit": {
+      "main": [
+        [
+          {
+            "node": "Send Edited Draft for Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Edited Draft for Review": {
+      "main": [
+        [
+          {
+            "node": "Record Edited Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kuala_Lumpur"
+  }
+}

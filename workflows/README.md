@@ -5,8 +5,9 @@ Workflows are organised by accountable agent, then business capability. Agent ow
 | Portfolio | Scope | Templates |
 | --- | --- | --- |
 | Hafeez_bot | Threads content and community engagement | `hafeez_bot/threads/` — outbound, autopost, autoreply, content factory |
+| Hafeez_bot | Robot People public education | `hafeez_bot/robot-people/` — daily draft generation and Telegram review request |
 | Hafeez_bot | Takaful content | `hafeez_bot/takaful/` — manual content preparation |
-| Fahmi_bot | Shared human approval coordination and authorised publishing | `fahmi_bot/approvals/` — approval handler |
+| Fahmi_bot | Shared human review coordination | `fahmi_bot/approvals/` — separate handlers for publishing approvals and Robot People review decisions |
 | Salleh_bot | Read-only security reporting | `salleh_bot/security/` — security report |
 | Azri_bot | Manual integration maintenance | `azri_bot/maintenance/` — legacy token setup; not production-ready |
 | Alan_bot | Sales qualification and customer care | No verified workflow yet |
@@ -28,6 +29,8 @@ Every new workflow must declare owner, purpose, brand, trigger/schedule/timezone
 Templates stay inactive in version control. Record activation separately with deployed workflow ID/version, timestamp and test evidence. Manual maintenance tools should not be scheduled merely to make every workflow active.
 
 ## Current activation gates
+
+Robot People's daily draft and review-decision workflows were verified active on 16 September 2026. They store the draft and decision in PostgreSQL, accept actions only from the configured Telegram reviewer and chat, and contain no Threads publishing operation. An approval records `APPROVED`; it does not publish.
 
 The live read-only inventory on 15 September 2026 showed the security report active; Threads outbound, approval handler, content factory and token setup inactive. Autopost and Autoreply were absent. This inventory does not verify functional health.
 
