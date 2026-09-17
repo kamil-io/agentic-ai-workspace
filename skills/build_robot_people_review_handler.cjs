@@ -18,9 +18,10 @@ if(cb){
 }
 const message=update.message;
 if(message){
- const reviewerId=String(message.from?.id||''),chatId=String(message.chat?.id||''),rawReplyId=Number(message.reply_to_message?.message_id),editedText=String(message.text||'').trim();
+ const reviewerId=String(message.from?.id||''),chatId=String(message.chat?.id||''),rawReplyId=Number(message.reply_to_message?.message_id),rawEditedText=String(message.text||'').trim();
  const replyToMessageId=Number.isSafeInteger(rawReplyId)&&rawReplyId>0?rawReplyId:null;
- if(reviewerId!==expectedReviewerId||chatId!==expectedChatId||!editedText||editedText.startsWith('/')||[...editedText].length>500)return [];
+ const editedText=rawEditedText.replace(/\\n\\n— Admin$/u,'').trim()+'\\n\\n— Admin';
+ if(reviewerId!==expectedReviewerId||chatId!==expectedChatId||!rawEditedText||rawEditedText.startsWith('/')||[...editedText].length>500)return [];
  return [{json:{kind:'edit_reply',reviewerId,chatId,replyToMessageId,editedText}}];
 }
 return [];`});

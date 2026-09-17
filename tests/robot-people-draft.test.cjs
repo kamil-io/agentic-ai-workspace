@@ -14,7 +14,9 @@ test('daily review template has no publishing capability or secret fields',()=>{
 test('invalid or blocked model output stops rather than using replacement content',()=>{
  const run=r=>new Function('$input',node('Validate Generated Draft').parameters.jsCode)({first:()=>({json:r})});
  for(const r of [{},{promptFeedback:{blockReason:'SAFETY'}},{candidates:[{finishReason:'MAX_TOKENS'}]},{candidates:[{finishReason:'STOP',content:{parts:[{text:'x'.repeat(501)}]}}]},{candidates:[{finishReason:'STOP',content:{parts:[{text:'Guna *dashboard* untuk kerja'}]}}]},{candidates:[{finishReason:'STOP',content:{parts:[{text:'We assign owner dan due date'}]}}]},{candidates:[{finishReason:'STOP',content:{parts:[{text:'AI kami boleh urus semua mesej'}]}}]},{candidates:[{finishReason:'STOP',content:{parts:[{text:'Semua masuk ke dalam senarai rapi secara automatik'}]}}]},{candidates:[{finishReason:'STOP',content:{parts:[{text:'Deploy agentic system untuk lead triage'}]}}]}])assert.throws(()=>run(r));
- assert.equal(run({candidates:[{finishReason:'STOP',content:{parts:[{text:'Draft example'}]}}]})[0].json.text,'Draft example');
+ assert.equal(run({candidates:[{finishReason:'STOP',content:{parts:[{text:'Draft example'}]}}]})[0].json.text,'Draft example\n\n— Admin');
+ assert.equal(run({candidates:[{finishReason:'STOP',content:{parts:[{text:'Draft example\n\n— Admin'}]}}]})[0].json.text,'Draft example\n\n— Admin');
+ assert.throws(()=>run({candidates:[{finishReason:'STOP',content:{parts:[{text:'x'.repeat(492)}]}}]}));
 });
 test('daily claim is unique and persistence precedes review delivery',()=>{
  assert.match(node('Ensure Draft Store').parameters.query,/draft_date DATE NOT NULL UNIQUE/);

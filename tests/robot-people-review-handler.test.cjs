@@ -50,9 +50,11 @@ test('callback parser accepts only the trusted reviewer, chat and action format'
 });
 test('trusted reply becomes a bounded manual edit request',()=>{
  const update={body:{message:{text:'Ayat yang saya sudah baiki.',from:{id:765967664},chat:{id:765967664},reply_to_message:{message_id:44}}}};
- assert.deepEqual(runParser(update)[0].json,{kind:'edit_reply',reviewerId:'765967664',chatId:'765967664',replyToMessageId:44,editedText:'Ayat yang saya sudah baiki.'});
+ assert.deepEqual(runParser(update)[0].json,{kind:'edit_reply',reviewerId:'765967664',chatId:'765967664',replyToMessageId:44,editedText:'Ayat yang saya sudah baiki.\n\n— Admin'});
+ const alreadyMarked={body:{message:{...update.body.message,text:'Ayat yang saya sudah baiki.\n\n— Admin'}}};
+ assert.equal(runParser(alreadyMarked)[0].json.editedText,'Ayat yang saya sudah baiki.\n\n— Admin');
  assert.deepEqual(runParser({body:{message:{...update.body.message,text:'x'.repeat(501)}}}),[]);
  const plain={body:{message:{text:'Teks biasa untuk menggantikan draf.',from:{id:765967664},chat:{id:765967664}}}};
- assert.deepEqual(runParser(plain)[0].json,{kind:'edit_reply',reviewerId:'765967664',chatId:'765967664',replyToMessageId:null,editedText:'Teks biasa untuk menggantikan draf.'});
+ assert.deepEqual(runParser(plain)[0].json,{kind:'edit_reply',reviewerId:'765967664',chatId:'765967664',replyToMessageId:null,editedText:'Teks biasa untuk menggantikan draf.\n\n— Admin'});
  assert.deepEqual(runParser({body:{message:{...plain.body.message,text:'/cancel'}}}),[]);
 });

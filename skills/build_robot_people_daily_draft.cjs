@@ -67,13 +67,15 @@ if(r.promptFeedback?.blockReason) throw new Error('Model blocked the draft');
 const c=r.candidates?.[0];
 if(c?.finishReason!=='STOP') throw new Error('Draft generation incomplete');
 const text=(c.content?.parts||[]).filter(p=>!p.thought && typeof p.text==='string').map(p=>p.text).join('').trim();
-if(!text || [...text].length>500) throw new Error('Draft empty or exceeds 500 characters');
+const footer='— Admin';
+const publishedText=text.replace(/\\n\\n— Admin$/u,'').trim()+'\\n\\n'+footer;
+if(!text || [...publishedText].length>500) throw new Error('Draft empty or exceeds 500 characters after attribution');
 if(/[*_\`#]/.test(text)) throw new Error('Draft contains markdown formatting');
 if(/\\b(commitments?|action items?|assign owner|due date|chase updates?)\\b/i.test(text)) throw new Error('Draft contains avoidable corporate jargon');
 if(/\\b(AI|sistem) kami\\b/i.test(text)) throw new Error('Draft implies an unverified live capability');
 if(/\\b(terlepas pandang|rekod yang jelas|senarai rapi|untuk kepastian|secara automatik|cara ini)\\b/i.test(text)) throw new Error('Draft contains stiff brochure language');
 if(/\\b(deploy|lead triage|classify|intent|priority|PIC|edge cases|execute|standardize|agentic system)\\b/i.test(text)) throw new Error('Draft contains public-facing technical jargon');
-return [{json:{text}}];`});
+return [{json:{text:publishedText}}];`});
 add('Store Exact Draft','postgres',{operation:'executeQuery',query:`UPDATE public.robot_people_content_drafts SET draft_text=$1,status='PENDING_REVIEW',updated_at=now()
 WHERE id=$2::bigint AND execution_id=$3 AND status='GENERATING' RETURNING id,draft_text,draft_date;`,options:{queryReplacement:"={{ [ $json.text, $('Claim Daily Draft').first().json.id, $execution.id ] }}"}},2.6);
 add('Send Draft for Human Review','telegram',{resource:'message',operation:'sendMessage',chatId:"={{ $('Prepare Robot People Brief').first().json.chatId }}",text:"={{ 'Hafeez_bot | Robot People | Draft #' + $json.id + '\\n\\n' + $json.draft_text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') + '\\n\\nReview only. Approve to publish this exact text once to @robot.people.' }}",additionalFields:{parse_mode:'HTML',appendAttribution:false},replyMarkup:'inlineKeyboard',inlineKeyboard:{rows:[{row:{buttons:[{text:'✅ Approve & publish',additionalFields:{callback_data:"=rp_approve_{{ $json.id }}"}},{text:'❌ Reject',additionalFields:{callback_data:"=rp_reject_{{ $json.id }}"}}]}},{row:{buttons:[{text:'✏️ Request edit',additionalFields:{callback_data:"=rp_edit_{{ $json.id }}"}}]}}]}},1.2);
