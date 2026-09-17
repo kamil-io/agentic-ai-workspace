@@ -21,4 +21,6 @@ test('Robot People prompt applies evidence, awareness and plain-language rules',
  assert.match(prompt,/purpose is awareness/);
  assert.match(prompt,/helpful question rather than a sales pitch/);
  assert.match(prompt,/translate it into a familiar business outcome/);
+ assert.match(prompt,/Malaysian business owners who are curious about AI agents/);
+ assert.match(prompt,/Teach one useful AI-agent idea/);
 });

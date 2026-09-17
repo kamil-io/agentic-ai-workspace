@@ -25,7 +25,9 @@ test('daily claim is unique and persistence precedes review delivery',()=>{
  assert.match(node('Ensure Draft Store').parameters.query,/publish_status TEXT NOT NULL DEFAULT 'UNPUBLISHED'/);
  const claim=node('Claim Daily Draft').parameters.query;
  assert.match(claim,/ON CONFLICT \(draft_date\) DO UPDATE/);
- assert.match(claim,/WHERE robot_people_content_drafts\.status='FAILED'/);
+ assert.match(claim,/robot_people_content_drafts\.status='FAILED'/);
+ assert.match(claim,/review_status='REJECTED'/);
+ assert.match(claim,/publish_status='UNPUBLISHED'/);
  assert.match(claim,/execution_id=EXCLUDED\.execution_id/);
  assert.match(claim,/publish_enabled=true/);
  assert.equal(w.connections['Store Exact Draft'].main[0][0].node,'Send Draft for Human Review');
